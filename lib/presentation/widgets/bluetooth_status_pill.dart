@@ -39,7 +39,7 @@ class _BluetoothStatusPillState extends State<BluetoothStatusPill>
       case BluetoothPillVariant.connected:
         bg = AppColors.feltPale;
         fg = AppColors.felt;
-        label = 'Tower connected';
+        label = 'Bluetooth is on';
         dot = Container(
           width: 7,
           height: 7,
@@ -49,7 +49,7 @@ class _BluetoothStatusPillState extends State<BluetoothStatusPill>
       case BluetoothPillVariant.off:
         bg = AppColors.coralPale;
         fg = AppColors.coral;
-        label = 'Not connected';
+        label = 'Bluetooth is off';
         dot = Container(
           width: 7,
           height: 7,

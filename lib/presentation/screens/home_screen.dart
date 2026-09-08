@@ -20,12 +20,20 @@ class HomeScreen extends StatelessWidget {
     required this.onStartGame,
     this.onOpenSettings,
     this.onHowToPlay,
+    this.onTurnOnBluetooth,
+    this.onOpenPermissions,
+    this.onCancelScan,
+    this.onRetryScan,
   });
 
   final HomeConnectionState connectionState;
   final VoidCallback onStartGame;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onHowToPlay;
+  final VoidCallback? onTurnOnBluetooth;
+  final VoidCallback? onOpenPermissions;
+  final VoidCallback? onCancelScan;
+  final VoidCallback? onRetryScan;
 
   bool get _isConnected => connectionState == HomeConnectionState.connected;
 
@@ -121,19 +129,28 @@ class HomeScreen extends StatelessWidget {
       case HomeConnectionState.off:
         return Column(
           children: [
-            const PrimaryButton(label: 'Turn On Bluetooth', onPressed: null),
+            PrimaryButton(
+              label: 'Turn On Bluetooth',
+              onPressed: onTurnOnBluetooth,
+            ),
             const SizedBox(height: 6),
             GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
           ],
         );
       case HomeConnectionState.permissionRequired:
-        return const PrimaryButton(label: 'Open Settings', onPressed: null);
+        return PrimaryButton(
+          label: 'Open Settings',
+          onPressed: onOpenPermissions,
+        );
       case HomeConnectionState.searching:
-        return const SecondaryButton(label: 'Cancel', onPressed: null);
+        return SecondaryButton(label: 'Cancel', onPressed: onCancelScan);
       case HomeConnectionState.notFound:
         return Column(
           children: [
-            const PrimaryButton(label: 'Try Again', onPressed: null),
+            PrimaryButton(
+              label: 'Try Again',
+              onPressed: onRetryScan ?? onStartGame,
+            ),
             const SizedBox(height: 6),
             GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
           ],
