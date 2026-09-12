@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:jenga/presentation/theme/theme.dart';
+import '../theme/theme.dart';
 import '../widgets/buttons.dart';
 
 enum ChallengeResult { pending, success, failed }

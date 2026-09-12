@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:jenga/models/challenge_model.dart';
+import 'package:jenga/services/challenge_service.dart';
 import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/presentation/ui/player_components.dart';
 import 'package:jenga/presentation/widgets/buttons.dart';
@@ -15,20 +17,27 @@ class PlayScreen extends StatelessWidget {
     required this.totalBlockCount,
     this.isUnstable = false,
     this.errorMessage,
+    this.activeChallenge,
     this.onPause,
   });
 
   final String currentPlayerName;
   final GamePhase phase;
   final int intactLayers;
-  final int totalBlockCount; // Dynamic block count from state
+  final int totalBlockCount;
   final bool isUnstable;
   final String? errorMessage;
+  final ChallengeProgress? activeChallenge;
   final VoidCallback? onPause;
 
   int get _blocksRemaining => totalBlockCount;
 
   String get _instruction {
+    // Override standard instructions if a challenge is active
+    if (activeChallenge != null && phase != GamePhase.waitingPlacement) {
+      return activeChallenge!.challenge.description;
+    }
+
     switch (phase) {
       case GamePhase.turn:
         return 'Remove a block.';
@@ -65,14 +74,15 @@ class PlayScreen extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.topCenter,
                 children: [
-                  if (phase == GamePhase.blockRemoved)
+                  if (phase == GamePhase.blockRemoved &&
+                      activeChallenge == null)
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
                       child: FeedbackChip(label: 'Block removed', icon: '✓'),
                     ),
                   if (errorMessage != null)
                     Padding(
-                      padding: EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.only(top: 4),
                       child: FeedbackChip(label: errorMessage!, icon: '✕'),
                     ),
                   Column(
@@ -82,16 +92,36 @@ class PlayScreen extends StatelessWidget {
                         const UnstableBanner(),
                         const SizedBox(height: 14),
                       ],
+                      // Show an ongoing Challenge Banner if active
+                      if (activeChallenge != null) ...[
+                        FeedbackChip(
+                          label:
+                              'Challenge: ${activeChallenge!.challenge.title}',
+                          icon: ChallengeService.getChallengeIcon(
+                            activeChallenge!.challenge.type,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
                       Text(
                         "${currentPlayerName.toUpperCase()}'S TURN",
                         style: AppText.eyebrow(),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        _instruction,
-                        style: AppText.body(
-                          size: 15,
-                          color: AppColors.walnutSoft,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          _instruction,
+                          textAlign: TextAlign.center,
+                          style: AppText.body(
+                            size: 15,
+                            color: activeChallenge != null
+                                ? AppColors.felt
+                                : AppColors.walnutSoft,
+                            weight: activeChallenge != null
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -132,7 +162,6 @@ class PlayScreen extends StatelessWidget {
   }
 }
 
-/// Bottom sheet shown when the player taps the pause control.
 Future<void> showGamePausedSheet(
   BuildContext context, {
   required VoidCallback onResume,

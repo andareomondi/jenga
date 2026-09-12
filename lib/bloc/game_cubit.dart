@@ -6,19 +6,25 @@ import 'package:jenga/presentation/screens/diagonistic_screen.dart';
 import 'package:jenga/presentation/screens/play_screen.dart';
 import 'package:jenga/presentation/screens/score_board_screen.dart';
 import 'package:jenga/repo/bluetooth_repository.dart';
+import 'package:jenga/services/challenge_service.dart';
+import 'package:jenga/models/challenge_model.dart';
+import 'package:flutter/material.dart';
 
 class GameState {
   final List<Player> players;
   final int currentPlayerIndex;
   final GamePhase phase;
   final int totalBlockCount;
-  final int maxBlockCount; // Dynamic peak block ceiling
+  final int maxBlockCount;
   final int intactLayers;
   final bool isUnstable;
   final Map<String, ScoreboardPlayer> playerStats;
   final List<DiagEvent> hardwareEvents;
   final String? errorMessage;
   final DateTime? errorTimestamp;
+  final ChallengeProgress? activeChallenge;
+  final List<ChallengeProgress> completedChallenges;
+  final int turnCount;
 
   const GameState({
     required this.players,
@@ -32,6 +38,9 @@ class GameState {
     required this.hardwareEvents,
     this.errorMessage,
     this.errorTimestamp,
+    this.activeChallenge,
+    this.completedChallenges = const [],
+    this.turnCount = 0,
   });
 
   Player get currentPlayer => players.isNotEmpty
@@ -56,6 +65,9 @@ class GameState {
     List<DiagEvent>? hardwareEvents,
     String? errorMessage,
     DateTime? errorTimestamp,
+    ChallengeProgress? activeChallenge,
+    List<ChallengeProgress>? completedChallenges,
+    int? turnCount,
   }) {
     return GameState(
       players: players ?? this.players,
@@ -69,13 +81,18 @@ class GameState {
       hardwareEvents: hardwareEvents ?? this.hardwareEvents,
       errorMessage: errorMessage ?? this.errorMessage,
       errorTimestamp: errorTimestamp ?? this.errorTimestamp,
+      activeChallenge: activeChallenge ?? this.activeChallenge,
+      completedChallenges: completedChallenges ?? this.completedChallenges,
+      turnCount: turnCount ?? this.turnCount,
     );
   }
 }
 
 class GameCubit extends Cubit<GameState> {
   final BluetoothRepository _btRepository;
+  final ChallengeService _challengeService = ChallengeService();
   StreamSubscription<TowerEvent>? _eventSubscription;
+  Timer? _challengeTimer;
 
   GameCubit({
     required List<Player> initialPlayers,
@@ -87,8 +104,7 @@ class GameCubit extends Cubit<GameState> {
            currentPlayerIndex: 0,
            phase: GamePhase.turn,
            totalBlockCount: 54,
-           maxBlockCount:
-               54, // Default baseline, updates dynamically if higher counts appear
+           maxBlockCount: 54,
            intactLayers: 18,
            isUnstable: false,
            hardwareEvents: const [],
@@ -101,6 +117,8 @@ class GameCubit extends Cubit<GameState> {
                  challenges: 0,
                ),
            },
+           completedChallenges: const [],
+           turnCount: 0,
          ),
        ) {
     _listenToTower();
@@ -124,7 +142,6 @@ class GameCubit extends Cubit<GameState> {
         ? event.newCount
         : state.totalBlockCount;
 
-    // Watch for the highest number passed and update max block ceiling if greater
     final updatedMaxCount = updatedTotalCount > state.maxBlockCount
         ? updatedTotalCount
         : state.maxBlockCount;
@@ -147,10 +164,50 @@ class GameCubit extends Cubit<GameState> {
           state.playerStats,
         );
 
+        int pointsEarned = 10; // Base points
+
+        // Check if this removes blocks match active challenge
+        if (state.activeChallenge != null) {
+          final challengeProgress = state.activeChallenge!;
+
+          // Validate block removal against challenge
+          if (_challengeService.validateBlockRemoval(
+            challengeProgress.challenge,
+            0, // layer (parsed from event if available)
+            0, // position (parsed from event if available)
+          )) {
+            // Update challenge progress
+            final updatedProgress = challengeProgress.copyWith(
+              blocksRemoved: challengeProgress.blocksRemoved + 1,
+            );
+
+            // Check if challenge completed
+            if (_challengeService.isChallengeCompleted(updatedProgress)) {
+              final reward = _challengeService.calculateReward(
+                challengeProgress.challenge,
+                onFirstAttempt: true,
+                timeRemainingSeconds: updatedProgress.timeRemainingSeconds,
+              );
+              pointsEarned += reward;
+
+              // Mark challenge as completed
+              _completeChallengeForCurrentPlayer(
+                updatedProgress.copyWith(status: ChallengeStatus.completed),
+              );
+
+              // Emit challenge completed event
+              _showChallengeCompletedFeedback(challengeProgress.challenge);
+            } else {
+              // Update active challenge progress
+              emit(nextState.copyWith(activeChallenge: updatedProgress));
+            }
+          }
+        }
+
         if (currentStats != null) {
           updatedStats[state.currentPlayer.id] = ScoreboardPlayer(
             name: currentStats.name,
-            points: currentStats.points + 10,
+            points: currentStats.points + pointsEarned,
             blocksRemoved: currentStats.blocksRemoved + 1,
             challenges: currentStats.challenges,
           );
@@ -176,12 +233,21 @@ class GameCubit extends Cubit<GameState> {
       if (state.phase == GamePhase.waitingPlacement) {
         final nextPlayerIndex =
             (state.currentPlayerIndex + 1) % state.players.length;
-        emit(
-          nextState.copyWith(
-            phase: GamePhase.turn,
-            currentPlayerIndex: nextPlayerIndex,
-          ),
+
+        // Increment turn count and check for challenge
+        final newTurnCount = state.turnCount + 1;
+        var newState = nextState.copyWith(
+          phase: GamePhase.turn,
+          currentPlayerIndex: nextPlayerIndex,
+          turnCount: newTurnCount,
         );
+
+        // Check if challenge should be triggered
+        if (_challengeService.shouldTriggerChallenge(newTurnCount)) {
+          _triggerNewChallenge(newState);
+        } else {
+          emit(newState);
+        }
       } else if (state.phase == GamePhase.turn ||
           state.phase == GamePhase.blockRemoved) {
         emit(
@@ -197,11 +263,140 @@ class GameCubit extends Cubit<GameState> {
     }
   }
 
+  /// Trigger a new challenge for the current player
+  void _triggerNewChallenge(GameState currentState) {
+    final challenge = _challengeService.generateRandomChallenge(
+      currentTowerBlockCount: currentState.totalBlockCount,
+      intactLayers: currentState.intactLayers,
+    );
+
+    final progress = ChallengeProgress(
+      challenge: challenge,
+      status: ChallengeStatus.active,
+      blocksRemoved: 0,
+      blocksRequired: 1,
+      startTime: DateTime.now(),
+      timeRemainingSeconds: challenge.timeLimit,
+    );
+
+    // Start countdown timer if challenge has time limit
+    if (challenge.timeLimit > 0) {
+      _startChallengeTimer(progress);
+    }
+
+    emit(currentState.copyWith(activeChallenge: progress));
+    _showChallengeAlert(challenge);
+  }
+
+  /// Start countdown timer for time-limited challenge
+  void _startChallengeTimer(ChallengeProgress progress) {
+    _challengeTimer?.cancel();
+
+    int secondsRemaining = progress.challenge.timeLimit;
+
+    _challengeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      secondsRemaining--;
+
+      if (secondsRemaining <= 0) {
+        timer.cancel();
+        _failChallenge();
+      } else {
+        // Update time remaining in challenge
+        emit(
+          state.copyWith(
+            activeChallenge: state.activeChallenge?.copyWith(
+              timeRemainingSeconds: secondsRemaining,
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  /// Complete challenge for current player
+  void _completeChallengeForCurrentPlayer(ChallengeProgress completed) {
+    final currentStats = state.playerStats[state.currentPlayer.id];
+    final updatedStats = Map<String, ScoreboardPlayer>.from(state.playerStats);
+
+    if (currentStats != null) {
+      updatedStats[state.currentPlayer.id] = ScoreboardPlayer(
+        name: currentStats.name,
+        points: currentStats.points, // Points already added in block removal
+        blocksRemoved: currentStats.blocksRemoved,
+        challenges: currentStats.challenges + 1,
+      );
+    }
+
+    _challengeTimer?.cancel();
+
+    emit(
+      state.copyWith(
+        activeChallenge: null,
+        playerStats: updatedStats,
+        completedChallenges: [...state.completedChallenges, completed],
+      ),
+    );
+  }
+
+  /// Fail the active challenge
+  void _failChallenge() {
+    if (state.activeChallenge == null) return;
+
+    final failed = state.activeChallenge!.copyWith(
+      status: ChallengeStatus.failed,
+      completedTime: DateTime.now(),
+    );
+
+    _challengeTimer?.cancel();
+
+    emit(
+      state.copyWith(
+        activeChallenge: null,
+        completedChallenges: [...state.completedChallenges, failed],
+      ),
+    );
+
+    _showChallengeFailed();
+  }
+
+  /// Skip active challenge
+  void skipChallenge() {
+    if (state.activeChallenge == null) return;
+
+    final skipped = state.activeChallenge!.copyWith(
+      status: ChallengeStatus.skipped,
+      completedTime: DateTime.now(),
+    );
+
+    _challengeTimer?.cancel();
+
+    emit(
+      state.copyWith(
+        activeChallenge: null,
+        completedChallenges: [...state.completedChallenges, skipped],
+      ),
+    );
+  }
+
   void _addDiagEvent(DiagEvent event) {
     emit(state.copyWith(hardwareEvents: [event, ...state.hardwareEvents]));
   }
 
+  void _showChallengeAlert(Challenge challenge) {
+    debugPrint('[Challenge] Alert: ${challenge.title}');
+    debugPrint('[Challenge] Description: ${challenge.description}');
+  }
+
+  void _showChallengeCompletedFeedback(Challenge challenge) {
+    debugPrint('[Challenge] Completed: ${challenge.title}');
+  }
+
+  void _showChallengeFailed() {
+    debugPrint('[Challenge] Failed: Time\'s up!');
+  }
+
   void restartGame() {
+    _challengeTimer?.cancel();
     emit(
       GameState(
         players: state.players,
@@ -221,6 +416,8 @@ class GameCubit extends Cubit<GameState> {
               challenges: 0,
             ),
         },
+        completedChallenges: const [],
+        turnCount: 0,
       ),
     );
   }
@@ -228,6 +425,7 @@ class GameCubit extends Cubit<GameState> {
   @override
   Future<void> close() {
     _eventSubscription?.cancel();
+    _challengeTimer?.cancel();
     return super.close();
   }
 }

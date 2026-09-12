@@ -45,7 +45,7 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(26, 20, 26, 24),
           child: Column(
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text('Jenga', style: AppText.display(size: 36)),
               const SizedBox(height: 6),
               Text(
@@ -53,7 +53,7 @@ class HomeScreen extends StatelessWidget {
                 style: AppText.body(size: 14.5, color: AppColors.walnutSoft),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 10),
               _statusPill(),
               const SizedBox(height: 8),
               Expanded(
@@ -61,6 +61,7 @@ class HomeScreen extends StatelessWidget {
                   child: Opacity(
                     opacity: _isConnected ? 1 : 0.35,
                     child: JengaTower(
+                      wobble: _isConnected ? false : true,
                       fullLayers: JengaTower.totalLayers,
                       blockWidth: 15,
                       blockHeight: 44,
@@ -68,6 +69,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 2),
               _actions(context),
             ],
           ),
@@ -134,7 +136,15 @@ class HomeScreen extends StatelessWidget {
               onPressed: onTurnOnBluetooth,
             ),
             const SizedBox(height: 6),
-            GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GhostTextButton(label: 'How to Play', onPressed: onHowToPlay),
+                const SizedBox(width: 8),
+                GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+              ],
+            ),
+            // GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
           ],
         );
       case HomeConnectionState.permissionRequired:
