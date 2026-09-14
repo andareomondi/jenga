@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:jenga/models/tower_event.dart';
 import 'package:jenga/models/challenge_model.dart';
 
-/// Service for managing game challenges
+/// Service for managing game challenges without spatial/layer constraints
 class ChallengeService {
   static final ChallengeService _instance = ChallengeService._internal();
 
@@ -23,7 +23,6 @@ class ChallengeService {
   }
 
   /// Check if a challenge should be triggered
-  /// Returns true if current turn count is divisible by frequency
   bool shouldTriggerChallenge(int totalTurnCount) {
     if (totalTurnCount <= 0) return false;
     final shouldTrigger = totalTurnCount % _challengeFrequency == 0;
@@ -34,107 +33,110 @@ class ChallengeService {
   }
 
   /// Generate a random challenge for the current player
-  Challenge generateRandomChallenge({
-    required int currentTowerBlockCount,
-    required int intactLayers,
-  }) {
+  Challenge generateRandomChallenge({required int currentTowerBlockCount}) {
     final difficulty = _selectRandomDifficulty();
     debugPrint('[Challenge] Generating $difficulty challenge');
 
     switch (difficulty) {
       case ChallengeDifficulty.easy:
-        return _generateEasyChallenge(currentTowerBlockCount, intactLayers);
+        return _generateEasyChallenge(currentTowerBlockCount);
       case ChallengeDifficulty.medium:
-        return _generateMediumChallenge(currentTowerBlockCount, intactLayers);
+        return _generateMediumChallenge(currentTowerBlockCount);
       case ChallengeDifficulty.hard:
-        return _generateHardChallenge(currentTowerBlockCount, intactLayers);
+        return _generateHardChallenge(currentTowerBlockCount);
     }
   }
 
-  /// Generate easy challenge (remove specific block)
-  Challenge _generateEasyChallenge(int blockCount, int intactLayers) {
-    if (intactLayers <= 0 || blockCount <= 0) {
-      return _generateFallbackChallenge();
+  /// Generate easy challenge (physical posture or generous timer)
+  Challenge _generateEasyChallenge(int blockCount) {
+    final easyType = _random.nextInt(3);
+
+    switch (easyType) {
+      case 0:
+        return Challenge.customConstraint(
+          title: 'Off-Hand Touch',
+          description: 'Remove 1 block using only your non-dominant hand!',
+          difficulty: ChallengeDifficulty.easy,
+          constraints: {'blockCount': 1},
+        );
+      case 1:
+        return Challenge.customConstraint(
+          title: 'Two-Finger Pinch',
+          description: 'Remove 1 block using only your thumb and index finger!',
+          difficulty: ChallengeDifficulty.easy,
+          constraints: {'blockCount': 1},
+        );
+      default:
+        return Challenge.customConstraint(
+          title: 'Steady Rhythm',
+          description: 'Remove 1 block within 30 seconds',
+          difficulty: ChallengeDifficulty.easy,
+          constraints: {'timeLimit': 30, 'blockCount': 1},
+        );
     }
-
-    // Pick random layer from intact layers
-    final layer = _random.nextInt(intactLayers);
-    final position = _random.nextInt(3); // 0, 1, 2
-
-    debugPrint(
-      '[Challenge] Easy: Remove block from layer $layer, position $position',
-    );
-
-    return Challenge.removeSpecificBlock(
-      blockLayer: layer,
-      blockPosition: position,
-    );
   }
 
-  /// Generate medium challenge (remove sequence of blocks)
-  Challenge _generateMediumChallenge(int blockCount, int intactLayers) {
-    if (intactLayers <= 1 || blockCount <= 2) {
-      return _generateFallbackChallenge();
+  /// Generate medium challenge (moderate time limit or multi-block)
+  Challenge _generateMediumChallenge(int blockCount) {
+    final mediumType = _random.nextInt(3);
+
+    switch (mediumType) {
+      case 0:
+        return Challenge.customConstraint(
+          title: 'Speed Pull',
+          description: 'Remove 1 block in under 15 seconds!',
+          difficulty: ChallengeDifficulty.medium,
+          constraints: {'timeLimit': 15, 'blockCount': 1},
+        );
+      case 1:
+        return Challenge.customConstraint(
+          title: 'Double Trouble',
+          description: 'Successfully remove 2 blocks during this turn!',
+          difficulty: ChallengeDifficulty.medium,
+          constraints: {'blockCount': 2},
+        );
+      default:
+        return Challenge.customConstraint(
+          title: 'One Finger Push',
+          description: 'Push a block out using only ONE finger!',
+          difficulty: ChallengeDifficulty.medium,
+          constraints: {'blockCount': 1},
+        );
     }
-
-    // Generate sequence of 2-3 blocks
-    final sequenceLength = 2 + _random.nextInt(2); // 2 or 3
-    final sequence = <Map<String, int>>[];
-
-    for (int i = 0; i < sequenceLength; i++) {
-      final layer = _random.nextInt(intactLayers);
-      final position = _random.nextInt(3);
-      sequence.add({'layer': layer, 'position': position});
-    }
-
-    debugPrint('[Challenge] Medium: Sequence of $sequenceLength blocks');
-
-    return Challenge.removeSequence(blockSequence: sequence);
   }
 
-  /// Generate hard challenge (complex constraint)
-  Challenge _generateHardChallenge(int blockCount, int intactLayers) {
-    if (intactLayers <= 1 || blockCount <= 3) {
-      return _generateFallbackChallenge();
-    }
-
-    // Random hard challenge type
+  /// Generate hard challenge (strict time limits or speed double removal)
+  Challenge _generateHardChallenge(int blockCount) {
     final hardType = _random.nextInt(3);
 
     switch (hardType) {
       case 0:
-        // Remove from specific layer only
-        final layer = _random.nextInt(intactLayers);
         return Challenge.customConstraint(
-          title: 'Layer Lock',
-          description: 'Remove a block only from layer $layer',
+          title: 'Lightning Reflexes',
+          description: 'Remove 1 block in under 8 seconds!',
           difficulty: ChallengeDifficulty.hard,
-          constraints: {'allowedLayer': layer},
+          constraints: {'timeLimit': 8, 'blockCount': 1},
         );
-
       case 1:
-        // Remove blocks with alternating pattern
         return Challenge.customConstraint(
-          title: 'Alternating Pattern',
-          description:
-              'Remove blocks alternating between top and bottom layers',
-          difficulty: ChallengeDifficulty.hard,
-          constraints: {'pattern': 'alternating', 'count': 2},
-        );
-
-      default:
-        // Time pressure challenge
-        return Challenge.customConstraint(
-          title: 'Quick Hands',
+          title: 'Rapid Double',
           description: 'Remove 2 blocks in under 20 seconds!',
           difficulty: ChallengeDifficulty.hard,
           constraints: {'timeLimit': 20, 'blockCount': 2},
         );
+      default:
+        return Challenge.customConstraint(
+          title: 'Off-Hand Sprint',
+          description:
+              'Remove 1 block in under 10 seconds using ONLY your non-dominant hand!',
+          difficulty: ChallengeDifficulty.hard,
+          constraints: {'timeLimit': 10, 'blockCount': 1},
+        );
     }
   }
 
-  /// Fallback challenge when tower state makes normal challenge impossible
-  Challenge _generateFallbackChallenge() {
+  /// Fallback challenge when conditions are edge-cases
+  Challenge generateFallbackChallenge() {
     return Challenge.customConstraint(
       title: 'Steady Hand',
       description: 'Remove 1 block carefully',
@@ -156,43 +158,7 @@ class ChallengeService {
     }
   }
 
-  /// Validate if a block removal satisfies a specific challenge
-  bool validateBlockRemoval(
-    Challenge challenge,
-    int removedLayer,
-    int removedPosition,
-  ) {
-    switch (challenge.type) {
-      case ChallengeType.removeSpecific:
-        final requiredLayer = challenge.constraints['layer'] as int;
-        final requiredPosition = challenge.constraints['position'] as int;
-        return removedLayer == requiredLayer &&
-            removedPosition == requiredPosition;
-
-      case ChallengeType.removeSequence:
-        // This is handled by ChallengeProgress tracking
-        return true;
-
-      case ChallengeType.timeLimit:
-        return true;
-
-      case ChallengeType.blockLimit:
-        return true;
-
-      case ChallengeType.layerSpecific:
-        final allowedLayer = challenge.constraints['allowedLayer'] as int;
-        return removedLayer == allowedLayer;
-
-      case ChallengeType.custom:
-        // Custom validation logic
-        if (challenge.title.contains('Steady Hand')) {
-          return true; // Always passes
-        }
-        return true;
-    }
-  }
-
-  /// Validate tower event against active challenge
+  /// Validate challenge state on incoming tower events
   bool validateChallengeProgress(ChallengeProgress progress, TowerEvent event) {
     if (event.type != TowerEventType.removed) {
       return false; // Only block removals count
@@ -201,14 +167,14 @@ class ChallengeService {
     // Check time limit
     if (progress.challenge.timeLimit > 0) {
       if (progress.timeRemainingSeconds <= 0) {
-        return false; // Time's up
+        return false; // Time expired
       }
     }
 
     return true;
   }
 
-  /// Check if challenge is completed based on progress
+  /// Check if challenge requirement is satisfied
   bool isChallengeCompleted(ChallengeProgress progress) {
     return progress.blocksRemoved >= progress.blocksRequired;
   }
@@ -221,14 +187,14 @@ class ChallengeService {
   }) {
     int baseReward = challenge.rewardPoints;
 
-    // Bonus for time remaining
+    // Time bonus
     if (challenge.timeLimit > 0 && timeRemainingSeconds > 0) {
       final timeBonus = (timeRemainingSeconds / challenge.timeLimit * 10)
           .toInt();
       baseReward += timeBonus;
     }
 
-    // Bonus for first attempt
+    // First attempt multiplier
     if (onFirstAttempt) {
       baseReward = (baseReward * 1.5).toInt();
     }
@@ -240,7 +206,6 @@ class ChallengeService {
     return baseReward;
   }
 
-  /// Get challenge difficulty description
   static String getDifficultyLabel(ChallengeDifficulty difficulty) {
     switch (difficulty) {
       case ChallengeDifficulty.easy:
@@ -252,19 +217,17 @@ class ChallengeService {
     }
   }
 
-  /// Get challenge difficulty color (for UI)
   static String getDifficultyColor(ChallengeDifficulty difficulty) {
     switch (difficulty) {
       case ChallengeDifficulty.easy:
-        return '#2F5D4F'; // felt (green)
+        return '#2F5D4F';
       case ChallengeDifficulty.medium:
-        return '#C17F3E'; // amber
+        return '#C17F3E';
       case ChallengeDifficulty.hard:
-        return '#D3654B'; // coral (red)
+        return '#D3654B';
     }
   }
 
-  /// Get challenge emoji icon
   static String getChallengeIcon(ChallengeType type) {
     switch (type) {
       case ChallengeType.removeSpecific:
