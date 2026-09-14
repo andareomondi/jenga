@@ -10,6 +10,7 @@ import 'package:jenga/presentation/screens/play_screen.dart';
 import 'package:jenga/presentation/screens/score_board_screen.dart';
 import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/presentation/ui/jenga_bottom_nav.dart';
+import 'package:jenga/presentation/screens/game_over_screen.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.players});
@@ -31,6 +32,9 @@ class _GameScreenState extends State<GameScreen> {
   ChallengeProgress? _overlayChallenge;
   ChallengeResult? _overlayResult;
 
+  // Tracks whether to show the collapse animation or the final scoreboard
+  bool _showResults = false;
+
   void _onTabChanged(JengaTab tab) {
     setState(() => _currentTab = tab);
   }
@@ -40,19 +44,16 @@ class _GameScreenState extends State<GameScreen> {
     showGamePausedSheet(
       context,
       onResume: () {},
-      onRestart: () => cubit.restartGame(),
+      onRestart: () {
+        setState(() => _showResults = false);
+        cubit.restartGame();
+      },
+      onEndGame: () => cubit.endGame(),
       onExit: () => Navigator.of(context).popUntil((route) => route.isFirst),
       onViewDiagnostics: () {
-        final state = cubit.state;
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => DiagnosticsScreen(
-              events: state.hardwareEvents,
-              blockCount: state.totalBlockCount,
-              totalBlocks: state.maxBlockCount,
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => DiagnosticsScreen()),
         );
       },
     );
@@ -93,6 +94,52 @@ class _GameScreenState extends State<GameScreen> {
           }
         },
         builder: (context, state) {
+          // ------------------------------------------------------------------
+          // GAME OVER FLOW INTERCEPT
+          // ------------------------------------------------------------------
+          if (state.phase == GamePhase.gameOver) {
+            if (_showResults) {
+              final winner = state.rankedPlayers.isNotEmpty
+                  ? state.rankedPlayers.first
+                  : null;
+
+              return Scaffold(
+                backgroundColor: AppColors.cream,
+                body: ResultsScreen(
+                  winner: winner?.name ?? 'No one',
+                  summary:
+                      '${winner?.points ?? 0} points · ${winner?.blocksRemoved ?? 0} blocks removed',
+                  ranked: state.rankedPlayers
+                      .map((p) => ResultsPlayer(p.name, p.points))
+                      .toList(),
+                  onPlayAgain: () {
+                    setState(() => _showResults = false);
+                    context.read<GameCubit>().restartGame();
+                  },
+                  onBackToHome: () =>
+                      Navigator.of(context).popUntil((route) => route.isFirst),
+                ),
+              );
+            } else {
+              return Scaffold(
+                backgroundColor: AppColors.cream,
+                body: TowerCollapseScreen(
+                  playerWhoCollapsedIt: state.currentPlayer.name,
+                  onViewResults: () {
+                    setState(() => _showResults = true);
+                  },
+                  onPlayAgain: () {
+                    setState(() => _showResults = false);
+                    context.read<GameCubit>().restartGame();
+                  },
+                ),
+              );
+            }
+          }
+
+          // ------------------------------------------------------------------
+          // STANDARD PLAY FLOW
+          // ------------------------------------------------------------------
           return Stack(
             children: [
               Scaffold(
@@ -105,27 +152,10 @@ class _GameScreenState extends State<GameScreen> {
                         totalBlockCount: state.totalBlockCount,
                         isUnstable: state.isUnstable,
                         errorMessage: state.errorMessage,
-                        activeChallenge: state
-                            .activeChallenge, // Pass active challenge to UI
+                        activeChallenge: state.activeChallenge,
                         onPause: () => _handlePause(context),
                       )
-                    : ScoreboardScreen(
-                        players: state.rankedPlayers,
-                        onPlayerTap: (player) {
-                          showPlayerStatsSheet(
-                            context,
-                            name: player.name,
-                            stats: const PlayerLifetimeStats(
-                              gamesPlayed: 12,
-                              gamesWon: 4,
-                              blocksRemoved: 34,
-                              challenges: 15,
-                              bestScore: 120,
-                            ),
-                          );
-                        },
-                        onViewHistory: () {},
-                      ),
+                    : ScoreboardScreen(players: state.rankedPlayers),
                 bottomNavigationBar: JengaBottomNav(
                   current: _currentTab,
                   onChanged: _onTabChanged,
@@ -141,14 +171,12 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   result: _overlayResult!,
                   onReady: () {
-                    // Dismiss overlay so they can play the turn
                     setState(() {
                       _overlayChallenge = null;
                       _overlayResult = null;
                     });
                   },
                   onContinue: () {
-                    // Dismiss overlay after seeing success/fail results
                     setState(() {
                       _overlayChallenge = null;
                       _overlayResult = null;

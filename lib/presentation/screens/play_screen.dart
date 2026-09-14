@@ -6,7 +6,13 @@ import 'package:jenga/presentation/ui/player_components.dart';
 import 'package:jenga/presentation/widgets/buttons.dart';
 import 'package:jenga/presentation/widgets/jenga_tower.dart';
 
-enum GamePhase { turn, blockRemoved, waitingPlacement, challengeActive }
+enum GamePhase {
+  turn,
+  blockRemoved,
+  waitingPlacement,
+  challengeActive,
+  gameOver,
+}
 
 class PlayScreen extends StatelessWidget {
   const PlayScreen({
@@ -47,6 +53,8 @@ class PlayScreen extends StatelessWidget {
         return 'Place it on top.';
       case GamePhase.challengeActive:
         return '';
+      case GamePhase.gameOver:
+        return 'Game Over!';
     }
   }
 
@@ -166,6 +174,7 @@ Future<void> showGamePausedSheet(
   BuildContext context, {
   required VoidCallback onResume,
   required VoidCallback onRestart,
+  required VoidCallback onEndGame,
   required VoidCallback onExit,
   required VoidCallback onViewDiagnostics,
 }) {
@@ -205,6 +214,15 @@ Future<void> showGamePausedSheet(
             onPressed: () {
               Navigator.pop(context);
               onRestart();
+            },
+          ),
+          const SizedBox(height: 10),
+          SecondaryButton(
+            label: 'End Game',
+            isDanger: true,
+            onPressed: () {
+              Navigator.pop(context);
+              onEndGame();
             },
           ),
           const SizedBox(height: 10),
