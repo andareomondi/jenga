@@ -90,10 +90,10 @@ class ChallengeService {
         );
       case 1:
         return Challenge.customConstraint(
-          title: 'Double Trouble',
-          description: 'Successfully remove 2 blocks during this turn!',
+          title: 'Shaky Base',
+          description: 'Remove a block from the base of the Jenga game',
           difficulty: ChallengeDifficulty.medium,
-          constraints: {'blockCount': 2},
+          constraints: {'blockCount': 1},
         );
       default:
         return Challenge.customConstraint(
@@ -107,7 +107,7 @@ class ChallengeService {
 
   /// Generate hard challenge (strict time limits or speed double removal)
   Challenge _generateHardChallenge(int blockCount) {
-    final hardType = _random.nextInt(3);
+    final hardType = _random.nextInt(4);
 
     switch (hardType) {
       case 0:
@@ -119,10 +119,18 @@ class ChallengeService {
         );
       case 1:
         return Challenge.customConstraint(
-          title: 'Rapid Double',
-          description: 'Remove 2 blocks in under 20 seconds!',
+          title: 'Sneak attack',
+          description:
+              'Remove 1 block of other players choosing in under 20 seconds!',
           difficulty: ChallengeDifficulty.hard,
-          constraints: {'timeLimit': 20, 'blockCount': 2},
+          constraints: {'timeLimit': 20, 'blockCount': 1},
+        );
+      case 2:
+        return Challenge.customConstraint(
+          title: 'Death Pull',
+          description: 'Remove 1 block with your eyes closed',
+          difficulty: ChallengeDifficulty.hard,
+          constraints: {'blockCount': 1},
         );
       default:
         return Challenge.customConstraint(

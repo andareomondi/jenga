@@ -46,7 +46,7 @@ class _PlayerRegistrationBottomSheetState
 
   Future<void> _loadExistingPlayers() async {
     try {
-      final existing = await _repository.getAllPlayers();
+      final existing = _repository.getAllPlayers();
       if (mounted) {
         setState(() {
           _existingPlayers = existing;

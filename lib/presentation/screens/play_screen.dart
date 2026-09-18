@@ -5,6 +5,7 @@ import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/presentation/ui/player_components.dart';
 import 'package:jenga/presentation/widgets/buttons.dart';
 import 'package:jenga/presentation/widgets/jenga_tower.dart';
+import 'package:jenga/presentation/widgets/toast.dart';
 
 enum GamePhase {
   turn,
@@ -89,6 +90,7 @@ class PlayScreen extends StatelessWidget {
                       child: FeedbackChip(label: 'Block removed', icon: '✓'),
                     ),
                   if (errorMessage != null)
+                    //TODO: Implement a toast for this instead of showing this chip
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: FeedbackChip(label: errorMessage!, icon: '✕'),
