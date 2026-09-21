@@ -3,6 +3,7 @@ import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/presentation/widgets/bluetooth_status_pill.dart';
 import 'package:jenga/presentation/widgets/buttons.dart';
 import 'package:jenga/presentation/widgets/jenga_tower.dart';
+import 'package:jenga/presentation/screens/settings_screen.dart'; // Import
 
 /// Home screen states — all variants of a single Home experience
 enum HomeConnectionState {
@@ -36,6 +37,13 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onRetryScan;
 
   bool get _isConnected => connectionState == HomeConnectionState.connected;
+
+  void _handleOpenSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +131,10 @@ class HomeScreen extends StatelessWidget {
               children: [
                 GhostTextButton(label: 'How to Play', onPressed: onHowToPlay),
                 const SizedBox(width: 8),
-                GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+                GhostTextButton(
+                  label: 'Settings',
+                  onPressed: () => _handleOpenSettings(context),
+                ),
               ],
             ),
           ],
@@ -141,10 +152,12 @@ class HomeScreen extends StatelessWidget {
               children: [
                 GhostTextButton(label: 'How to Play', onPressed: onHowToPlay),
                 const SizedBox(width: 8),
-                GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+                GhostTextButton(
+                  label: 'Settings',
+                  onPressed: () => _handleOpenSettings(context),
+                ),
               ],
             ),
-            // GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
           ],
         );
       case HomeConnectionState.permissionRequired:
@@ -162,7 +175,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: onRetryScan ?? onStartGame,
             ),
             const SizedBox(height: 6),
-            GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+            GhostTextButton(
+              label: 'Settings',
+              onPressed: () => _handleOpenSettings(context),
+            ),
           ],
         );
     }

@@ -10,6 +10,7 @@ import 'package:jenga/presentation/screens/score_board_screen.dart';
 import 'package:jenga/repo/bluetooth_repository.dart';
 import 'package:jenga/services/challenge_service.dart';
 import 'package:jenga/services/game_history_service.dart';
+import 'package:jenga/services/game_settings_service.dart';
 
 class GameState {
   final List<Player> players;
@@ -98,6 +99,7 @@ class GameState {
 class GameCubit extends Cubit<GameState> {
   final BluetoothRepository _btRepository;
   final ChallengeService _challengeService = ChallengeService();
+  final GameSettingsService _settings = GameSettingsService();
   StreamSubscription<TowerEvent>? _eventSubscription;
   Timer? _challengeTimer;
 
@@ -149,10 +151,13 @@ class GameCubit extends Cubit<GameState> {
     required int intactLayers,
     required bool isUnstable,
   }) {
-    if (isUnstable) return 15;
-    if (totalBlockCount <= 10) return 12;
-    if (intactLayers >= 12) return 8;
-    return 10;
+    final basePoints = _settings.getBaseBlockRemovalPoints();
+
+    if (isUnstable) return basePoints + 5; // Bonus for unstable
+    if (totalBlockCount <= _settings.getMinBlocksForGame())
+      return basePoints + 2;
+    if (intactLayers >= 12) return basePoints - 2;
+    return basePoints;
   }
 
   void _handleTowerEvent(TowerEvent event) {
@@ -160,7 +165,9 @@ class GameCubit extends Cubit<GameState> {
         ? event.newCount
         : state.totalBlockCount;
 
-    if (event.type == TowerEventType.removed && event.countDelta >= 3) {
+    final collapseDelta = _settings.getBlockCollapseDelta();
+    if (event.type == TowerEventType.removed &&
+        event.countDelta >= collapseDelta) {
       debugPrint(
         '[Collapse] Tower collapse detected by hardware! (Removed: ${event.countDelta} blocks)',
       );
@@ -175,7 +182,9 @@ class GameCubit extends Cubit<GameState> {
     final updatedLayers = (updatedTotalCount / 3).floor().clamp(0, 18);
     final updatedEvents = [event.toDiagEvent(), ...state.hardwareEvents];
 
-    final isUnstableNow = updatedTotalCount < (state.maxBlockCount * 0.2);
+    final unstableThreshold = _settings.getUnstableThreshold();
+    final isUnstableNow =
+        updatedTotalCount < (state.maxBlockCount * unstableThreshold);
 
     var nextState = state.copyWith(
       totalBlockCount: updatedTotalCount,
@@ -316,7 +325,9 @@ class GameCubit extends Cubit<GameState> {
   bool _shouldTriggerChallenge(GameState state, int turnCount) {
     if (!_challengeService.shouldTriggerChallenge(turnCount)) return false;
     if (state.activeChallenge != null) return false;
-    if (state.totalBlockCount < 6 || state.intactLayers < 2) return false;
+    if (state.totalBlockCount < _settings.getMinBlocksForGame() ||
+        state.intactLayers < 2)
+      return false;
     return true;
   }
 

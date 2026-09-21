@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:jenga/models/tower_event.dart';
 import 'package:jenga/models/challenge_model.dart';
+import 'package:jenga/services/game_settings_service.dart';
 
 /// Service for managing game challenges without spatial/layer constraints
 class ChallengeService {
@@ -14,20 +15,15 @@ class ChallengeService {
   ChallengeService._internal();
 
   final Random _random = Random();
-  int _challengeFrequency = 3; // Every 3rd turn triggers challenge check
-
-  /// Set challenge frequency (every N turns)
-  void setChallengeFrequency(int frequency) {
-    _challengeFrequency = frequency;
-    debugPrint('[Challenge] Frequency set to every $frequency turns');
-  }
+  final GameSettingsService _settings = GameSettingsService();
 
   /// Check if a challenge should be triggered
   bool shouldTriggerChallenge(int totalTurnCount) {
     if (totalTurnCount <= 0) return false;
-    final shouldTrigger = totalTurnCount % _challengeFrequency == 0;
+    final frequency = _settings.getChallengeFrequency();
+    final shouldTrigger = totalTurnCount % frequency == 0;
     debugPrint(
-      '[Challenge] Turn $totalTurnCount - Should trigger: $shouldTrigger',
+      '[Challenge] Turn $totalTurnCount - Should trigger: $shouldTrigger (frequency: $frequency)',
     );
     return shouldTrigger;
   }
@@ -50,6 +46,7 @@ class ChallengeService {
   /// Generate easy challenge (physical posture or generous timer)
   Challenge _generateEasyChallenge(int blockCount) {
     final easyType = _random.nextInt(3);
+    final easyReward = _settings.getEasyRewardPoints();
 
     switch (easyType) {
       case 0:
@@ -57,6 +54,7 @@ class ChallengeService {
           title: 'Off-Hand Touch',
           description: 'Remove 1 block using only your non-dominant hand!',
           difficulty: ChallengeDifficulty.easy,
+          // rewardPoints: easyReward,
           constraints: {'blockCount': 1},
         );
       case 1:
@@ -64,6 +62,7 @@ class ChallengeService {
           title: 'Two-Finger Pinch',
           description: 'Remove 1 block using only your thumb and index finger!',
           difficulty: ChallengeDifficulty.easy,
+          // rewardPoints: easyReward,
           constraints: {'blockCount': 1},
         );
       default:
@@ -71,6 +70,7 @@ class ChallengeService {
           title: 'Steady Rhythm',
           description: 'Remove 1 block within 30 seconds',
           difficulty: ChallengeDifficulty.easy,
+          // rewardPoints: easyReward,
           constraints: {'timeLimit': 30, 'blockCount': 1},
         );
     }
@@ -79,6 +79,7 @@ class ChallengeService {
   /// Generate medium challenge (moderate time limit or multi-block)
   Challenge _generateMediumChallenge(int blockCount) {
     final mediumType = _random.nextInt(3);
+    final mediumReward = _settings.getMediumRewardPoints();
 
     switch (mediumType) {
       case 0:
@@ -86,6 +87,7 @@ class ChallengeService {
           title: 'Speed Pull',
           description: 'Remove 1 block in under 15 seconds!',
           difficulty: ChallengeDifficulty.medium,
+          // rewardPoints: mediumReward,
           constraints: {'timeLimit': 15, 'blockCount': 1},
         );
       case 1:
@@ -93,6 +95,7 @@ class ChallengeService {
           title: 'Shaky Base',
           description: 'Remove a block from the base of the Jenga game',
           difficulty: ChallengeDifficulty.medium,
+          // rewardPoints: mediumReward,
           constraints: {'blockCount': 1},
         );
       default:
@@ -100,6 +103,7 @@ class ChallengeService {
           title: 'One Finger Push',
           description: 'Push a block out using only ONE finger!',
           difficulty: ChallengeDifficulty.medium,
+          // rewardPoints: mediumReward,
           constraints: {'blockCount': 1},
         );
     }
@@ -108,6 +112,7 @@ class ChallengeService {
   /// Generate hard challenge (strict time limits or speed double removal)
   Challenge _generateHardChallenge(int blockCount) {
     final hardType = _random.nextInt(4);
+    final hardReward = _settings.getHardRewardPoints();
 
     switch (hardType) {
       case 0:
@@ -115,6 +120,7 @@ class ChallengeService {
           title: 'Lightning Reflexes',
           description: 'Remove 1 block in under 8 seconds!',
           difficulty: ChallengeDifficulty.hard,
+          // rewardPoints: hardReward,
           constraints: {'timeLimit': 8, 'blockCount': 1},
         );
       case 1:
@@ -123,6 +129,7 @@ class ChallengeService {
           description:
               'Remove 1 block of other players choosing in under 20 seconds!',
           difficulty: ChallengeDifficulty.hard,
+          // rewardPoints: hardReward,
           constraints: {'timeLimit': 20, 'blockCount': 1},
         );
       case 2:
@@ -130,6 +137,7 @@ class ChallengeService {
           title: 'Death Pull',
           description: 'Remove 1 block with your eyes closed',
           difficulty: ChallengeDifficulty.hard,
+          // rewardPoints: hardReward,
           constraints: {'blockCount': 1},
         );
       default:
@@ -138,6 +146,7 @@ class ChallengeService {
           description:
               'Remove 1 block in under 10 seconds using ONLY your non-dominant hand!',
           difficulty: ChallengeDifficulty.hard,
+          // rewardPoints: hardReward,
           constraints: {'timeLimit': 10, 'blockCount': 1},
         );
     }
@@ -145,10 +154,12 @@ class ChallengeService {
 
   /// Fallback challenge when conditions are edge-cases
   Challenge generateFallbackChallenge() {
+    final easyReward = _settings.getEasyRewardPoints();
     return Challenge.customConstraint(
       title: 'Steady Hand',
       description: 'Remove 1 block carefully',
       difficulty: ChallengeDifficulty.easy,
+      // rewardPoints: easyReward,
       constraints: {'blockCount': 1},
     );
   }
