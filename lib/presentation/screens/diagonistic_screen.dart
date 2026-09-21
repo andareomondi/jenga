@@ -4,7 +4,7 @@ import 'package:jenga/models/tower_event.dart';
 import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/repo/bluetooth_repository.dart';
 
-enum DiagEventType { added, removed, softTap, handPlaced }
+enum DiagEventType { added, removed, softTap, handPlaced, commandSent }
 
 class DiagEvent {
   const DiagEvent({
@@ -39,6 +39,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   late final BluetoothRepository _btRepository;
   StreamSubscription<TowerEvent>? _eventSubscription;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _commandController = TextEditingController();
 
   late List<DiagEvent> _events;
   late int _blockCount;
@@ -84,6 +85,35 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     _scrollToBottom();
   }
 
+  Future<void> _sendCommand() async {
+    final command = _commandController.text.trim();
+    if (command.isEmpty) return;
+
+    _commandController.clear();
+
+    try {
+      // Send data to connected Bluetooth hardware
+      await _btRepository.sendData(command);
+
+      // Log sent command locally in the diagnostic list
+      _addEvent(
+        DiagEvent(
+          type: DiagEventType.commandSent,
+          detail: 'TX: $command',
+          time: DateTime.now().toIso8601String().substring(11, 19),
+        ),
+      );
+    } catch (e) {
+      _addEvent(
+        DiagEvent(
+          type: DiagEventType.softTap,
+          detail: 'TX Failed: $e',
+          time: DateTime.now().toIso8601String().substring(11, 19),
+        ),
+      );
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -100,6 +130,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   void dispose() {
     _eventSubscription?.cancel();
     _scrollController.dispose();
+    _commandController.dispose();
     super.dispose();
   }
 
@@ -179,18 +210,23 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  _tag(e.type),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    e.detail,
-                                    style: AppText.mono(
-                                      size: 12,
-                                      color: AppColors.walnut,
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    _tag(e.type),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        e.detail,
+                                        style: AppText.mono(
+                                          size: 12,
+                                          color: AppColors.walnut,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                               Text(
                                 e.time,
@@ -204,6 +240,60 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                         );
                       },
                     ),
+            ),
+            // Direct command entry for Bluetooth configuration
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: const BoxDecoration(
+                color: AppColors.creamDim,
+                border: Border(
+                  top: BorderSide(color: Color(0x1F2E2019), width: 1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _commandController,
+                      style: AppText.mono(size: 13, color: AppColors.walnut),
+                      decoration: InputDecoration(
+                        hintText: 'Type command (e.g., SET_SENSITIVITY:5)',
+                        hintStyle: AppText.mono(
+                          size: 12,
+                          color: AppColors.walnutSoft,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.cream,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onSubmitted: (_) => _sendCommand(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.amber,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: _sendCommand,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -235,6 +325,11 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         bg = Colors.blue.shade100;
         fg = Colors.blue.shade800;
         label = 'HAND PLACED';
+        break;
+      case DiagEventType.commandSent:
+        bg = AppColors.walnutSoft.withOpacity(0.2);
+        fg = AppColors.walnut;
+        label = 'SENT';
         break;
     }
     return Container(

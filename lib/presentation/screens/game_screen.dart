@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:jenga/bloc/game_cubit.dart';
 import 'package:jenga/models/player_model.dart';
 import 'package:jenga/models/challenge_model.dart';
 import 'package:jenga/presentation/ui/challenge_overlay.dart';
+import 'package:jenga/presentation/ui/connection_lost_overlay.dart';
+import 'package:jenga/presentation/ui/bluetooth_scanner_bottomsheet.dart';
 import 'package:jenga/services/challenge_service.dart';
 import 'package:jenga/presentation/screens/diagonistic_screen.dart';
 import 'package:jenga/presentation/screens/play_screen.dart';
@@ -11,6 +14,8 @@ import 'package:jenga/presentation/screens/score_board_screen.dart';
 import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/presentation/ui/jenga_bottom_nav.dart';
 import 'package:jenga/presentation/screens/game_over_screen.dart';
+import 'package:jenga/presentation/screens/game_setup_screen.dart';
+import 'package:jenga/repo/bluetooth_repository.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.players});
@@ -24,29 +29,77 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   JengaTab _currentTab = JengaTab.play;
 
-  // Track state transitions to trigger overlays
   int _completedCount = 0;
   String? _activeChallengeId;
-
-  // Local state to drive the overlay UI independently of the cubit
   ChallengeProgress? _overlayChallenge;
   ChallengeResult? _overlayResult;
-
-  // Tracks whether to show the collapse animation or the final scoreboard
   bool _showResults = false;
+
+  bool _isConnectionLost = false;
+  Timer? _connectionPollingTimer;
+  final BluetoothRepository _btRepo = BluetoothRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    _startConnectionPolling();
+  }
+
+  void _startConnectionPolling() {
+    // Poll the Future<bool> isConnected() every 2 seconds
+    _connectionPollingTimer = Timer.periodic(const Duration(seconds: 2), (
+      _,
+    ) async {
+      final isCurrentlyConnected = await _btRepo.isConnected();
+
+      if (mounted && _isConnectionLost == isCurrentlyConnected) {
+        setState(() {
+          _isConnectionLost = !isCurrentlyConnected;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectionPollingTimer?.cancel();
+    super.dispose();
+  }
 
   void _onTabChanged(JengaTab tab) {
     setState(() => _currentTab = tab);
   }
 
+  Future<void> _handleReconnect() async {
+    final device = await showBluetoothScannerBottomSheet(
+      context,
+      onDeviceSelected: () {
+        debugPrint('[GameScreen] Reconnection intent');
+      },
+    );
+
+    if (device != null && mounted) {
+      // Connect and save the device using your repo method
+      await _btRepo.connectAndSaveDevice(device);
+
+      final isNowConnected = await _btRepo.isConnected();
+      setState(() {
+        _isConnectionLost = !isNowConnected;
+      });
+    }
+  }
+
   void _handlePause(BuildContext context) {
     final cubit = context.read<GameCubit>();
+    // Assuming showGamePausedSheet exists in your codebase
     showGamePausedSheet(
       context,
       onResume: () {},
       onRestart: () {
-        setState(() => _showResults = false);
-        cubit.restartGame();
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const GameSetupScreen()),
+          (route) => route.isFirst,
+        );
       },
       onEndGame: () => cubit.endGame(),
       onExit: () => Navigator.of(context).popUntil((route) => route.isFirst),
@@ -62,7 +115,8 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => GameCubit(initialPlayers: widget.players),
+      create: (_) =>
+          GameCubit(initialPlayers: widget.players, btRepository: _btRepo),
       child: BlocConsumer<GameCubit, GameState>(
         listenWhen: (previous, current) {
           return previous.activeChallenge != current.activeChallenge ||
@@ -70,7 +124,6 @@ class _GameScreenState extends State<GameScreen> {
                   current.completedChallenges.length;
         },
         listener: (context, state) {
-          // Trigger overlay when a NEW challenge becomes active
           if (state.activeChallenge != null &&
               state.activeChallenge!.challenge.id != _activeChallengeId) {
             _activeChallengeId = state.activeChallenge!.challenge.id;
@@ -80,11 +133,9 @@ class _GameScreenState extends State<GameScreen> {
             });
           }
 
-          // Trigger overlay when a challenge completes or fails
           if (state.completedChallenges.length > _completedCount) {
             _completedCount = state.completedChallenges.length;
             final lastCompleted = state.completedChallenges.last;
-
             setState(() {
               _overlayChallenge = lastCompleted;
               _overlayResult = lastCompleted.status == ChallengeStatus.completed
@@ -94,27 +145,27 @@ class _GameScreenState extends State<GameScreen> {
           }
         },
         builder: (context, state) {
-          // ------------------------------------------------------------------
-          // GAME OVER FLOW INTERCEPT
-          // ------------------------------------------------------------------
           if (state.phase == GamePhase.gameOver) {
             if (_showResults) {
               final winner = state.rankedPlayers.isNotEmpty
                   ? state.rankedPlayers.first
                   : null;
-
               return Scaffold(
                 backgroundColor: AppColors.cream,
                 body: ResultsScreen(
                   winner: winner?.name ?? 'No one',
                   summary:
-                      '${winner?.points ?? 0} points · ${winner?.blocksRemoved ?? 0} blocks removed',
+                      '${winner?.points ?? 0} points · ${winner?.blocksRemoved ?? 0} blocks',
                   ranked: state.rankedPlayers
                       .map((p) => ResultsPlayer(p.name, p.points))
                       .toList(),
                   onPlayAgain: () {
-                    setState(() => _showResults = false);
-                    context.read<GameCubit>().restartGame();
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => const GameSetupScreen(),
+                      ),
+                      (route) => route.isFirst,
+                    );
                   },
                   onBackToHome: () =>
                       Navigator.of(context).popUntil((route) => route.isFirst),
@@ -125,21 +176,20 @@ class _GameScreenState extends State<GameScreen> {
                 backgroundColor: AppColors.cream,
                 body: TowerCollapseScreen(
                   playerWhoCollapsedIt: state.currentPlayer.name,
-                  onViewResults: () {
-                    setState(() => _showResults = true);
-                  },
+                  onViewResults: () => setState(() => _showResults = true),
                   onPlayAgain: () {
-                    setState(() => _showResults = false);
-                    context.read<GameCubit>().restartGame();
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => const GameSetupScreen(),
+                      ),
+                      (route) => route.isFirst,
+                    );
                   },
                 ),
               );
             }
           }
 
-          // ------------------------------------------------------------------
-          // STANDARD PLAY FLOW
-          // ------------------------------------------------------------------
           return Stack(
             children: [
               Scaffold(
@@ -162,7 +212,6 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
 
-              // Inject the Challenge Overlay on top of everything
               if (_overlayChallenge != null && _overlayResult != null)
                 ChallengeOverlay(
                   challengeText: _overlayChallenge!.challenge.description,
@@ -170,18 +219,30 @@ class _GameScreenState extends State<GameScreen> {
                     _overlayChallenge!.challenge.type,
                   ),
                   result: _overlayResult!,
-                  onReady: () {
-                    setState(() {
-                      _overlayChallenge = null;
-                      _overlayResult = null;
-                    });
+                  onReady: () => setState(() {
+                    _overlayChallenge = null;
+                    _overlayResult = null;
+                  }),
+                  onContinue: () => setState(() {
+                    _overlayChallenge = null;
+                    _overlayResult = null;
+                  }),
+                ),
+
+              // Highest priority overlay
+              if (_isConnectionLost)
+                ConnectionLostOverlay(
+                  onReconnect: _handleReconnect,
+                  onNewGame: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => const GameSetupScreen(),
+                      ),
+                      (route) => route.isFirst,
+                    );
                   },
-                  onContinue: () {
-                    setState(() {
-                      _overlayChallenge = null;
-                      _overlayResult = null;
-                    });
-                  },
+                  onExit: () =>
+                      Navigator.of(context).popUntil((route) => route.isFirst),
                 ),
             ],
           );

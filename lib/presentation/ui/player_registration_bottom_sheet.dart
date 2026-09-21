@@ -110,12 +110,22 @@ class _PlayerRegistrationBottomSheetState
     try {
       _players.clear();
 
-      for (final controller in _controllers) {
-        final name = controller.text.trim();
+      for (int i = 0; i < _controllers.length; i++) {
+        final name = _controllers[i].text.trim();
         if (name.isNotEmpty) {
-          final player = Player(name: name);
-          _players.add(player);
-          await _repository.createPlayer(name);
+          // Check if player already exists in registered list
+          final existingIndex = _existingPlayers.indexWhere(
+            (p) => p.name.toLowerCase() == name.toLowerCase(),
+          );
+
+          if (existingIndex != -1) {
+            // Reuse existing player without creating a new record
+            _players.add(_existingPlayers[existingIndex]);
+          } else {
+            // Create new player record in repository
+            final newPlayer = await _repository.createPlayer(name);
+            _players.add(newPlayer);
+          }
         }
       }
 

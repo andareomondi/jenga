@@ -15,7 +15,7 @@ enum GamePhase {
   gameOver,
 }
 
-class PlayScreen extends StatelessWidget {
+class PlayScreen extends StatefulWidget {
   const PlayScreen({
     super.key,
     required this.currentPlayerName,
@@ -37,15 +37,46 @@ class PlayScreen extends StatelessWidget {
   final ChallengeProgress? activeChallenge;
   final VoidCallback? onPause;
 
-  int get _blocksRemaining => totalBlockCount;
+  @override
+  State<PlayScreen> createState() => _PlayScreenState();
+}
+
+class _PlayScreenState extends State<PlayScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _showErrorToastIfNeeded(widget.errorMessage);
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.errorMessage != null &&
+        widget.errorMessage != oldWidget.errorMessage) {
+      _showErrorToastIfNeeded(widget.errorMessage);
+    }
+  }
+
+  void _showErrorToastIfNeeded(String? error) {
+    if (error == null || error.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ToastUtility.showError(context, message: error);
+      }
+    });
+  }
+
+  int get _blocksRemaining => widget.totalBlockCount;
 
   String get _instruction {
     // Override standard instructions if a challenge is active
-    if (activeChallenge != null && phase != GamePhase.waitingPlacement) {
-      return activeChallenge!.challenge.description;
+    if (widget.activeChallenge != null &&
+        widget.phase != GamePhase.waitingPlacement) {
+      return widget.activeChallenge!.challenge.description;
     }
 
-    switch (phase) {
+    switch (widget.phase) {
       case GamePhase.turn:
         return 'Remove a block.';
       case GamePhase.blockRemoved:
@@ -71,10 +102,10 @@ class PlayScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  PlayerAvatar(name: currentPlayerName),
+                  PlayerAvatar(name: widget.currentPlayerName),
                   RoundIconButton(
                     icon: Icons.pause_rounded,
-                    onPressed: onPause,
+                    onPressed: widget.onPause,
                   ),
                 ],
               ),
@@ -83,38 +114,32 @@ class PlayScreen extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.topCenter,
                 children: [
-                  if (phase == GamePhase.blockRemoved &&
-                      activeChallenge == null)
+                  if (widget.phase == GamePhase.blockRemoved &&
+                      widget.activeChallenge == null)
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
                       child: FeedbackChip(label: 'Block removed', icon: '✓'),
                     ),
-                  if (errorMessage != null)
-                    //TODO: Implement a toast for this instead of showing this chip
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: FeedbackChip(label: errorMessage!, icon: '✕'),
-                    ),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (isUnstable) ...[
+                      if (widget.isUnstable) ...[
                         const UnstableBanner(),
                         const SizedBox(height: 14),
                       ],
                       // Show an ongoing Challenge Banner if active
-                      if (activeChallenge != null) ...[
+                      if (widget.activeChallenge != null) ...[
                         FeedbackChip(
                           label:
-                              'Challenge: ${activeChallenge!.challenge.title}',
+                              'Challenge: ${widget.activeChallenge!.challenge.title}',
                           icon: ChallengeService.getChallengeIcon(
-                            activeChallenge!.challenge.type,
+                            widget.activeChallenge!.challenge.type,
                           ),
                         ),
                         const SizedBox(height: 14),
                       ],
                       Text(
-                        "${currentPlayerName.toUpperCase()}'S TURN",
+                        "${widget.currentPlayerName.toUpperCase()}'S TURN",
                         style: AppText.eyebrow(),
                       ),
                       const SizedBox(height: 6),
@@ -125,10 +150,10 @@ class PlayScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: AppText.body(
                             size: 15,
-                            color: activeChallenge != null
+                            color: widget.activeChallenge != null
                                 ? AppColors.felt
                                 : AppColors.walnutSoft,
-                            weight: activeChallenge != null
+                            weight: widget.activeChallenge != null
                                 ? FontWeight.w600
                                 : FontWeight.w400,
                           ),
@@ -136,9 +161,10 @@ class PlayScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                       JengaTower(
-                        fullLayers: intactLayers,
-                        wobble: isUnstable,
-                        placingTopLayer: phase == GamePhase.waitingPlacement,
+                        fullLayers: widget.intactLayers,
+                        wobble: widget.isUnstable,
+                        placingTopLayer:
+                            widget.phase == GamePhase.waitingPlacement,
                       ),
                       const SizedBox(height: 20),
                       Text.rich(
