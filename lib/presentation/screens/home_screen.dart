@@ -3,6 +3,7 @@ import 'package:jenga/presentation/theme/theme.dart';
 import 'package:jenga/presentation/widgets/bluetooth_status_pill.dart';
 import 'package:jenga/presentation/widgets/buttons.dart';
 import 'package:jenga/presentation/widgets/jenga_tower.dart';
+import 'package:jenga/presentation/screens/settings_screen.dart'; // Import
 
 /// Home screen states — all variants of a single Home experience
 enum HomeConnectionState {
@@ -37,6 +38,13 @@ class HomeScreen extends StatelessWidget {
 
   bool get _isConnected => connectionState == HomeConnectionState.connected;
 
+  void _handleOpenSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,7 +53,7 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(26, 20, 26, 24),
           child: Column(
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text('Jenga', style: AppText.display(size: 36)),
               const SizedBox(height: 6),
               Text(
@@ -53,7 +61,7 @@ class HomeScreen extends StatelessWidget {
                 style: AppText.body(size: 14.5, color: AppColors.walnutSoft),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 10),
               _statusPill(),
               const SizedBox(height: 8),
               Expanded(
@@ -61,6 +69,7 @@ class HomeScreen extends StatelessWidget {
                   child: Opacity(
                     opacity: _isConnected ? 1 : 0.35,
                     child: JengaTower(
+                      wobble: _isConnected ? false : true,
                       fullLayers: JengaTower.totalLayers,
                       blockWidth: 15,
                       blockHeight: 44,
@@ -68,6 +77,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 2),
               _actions(context),
             ],
           ),
@@ -121,7 +131,10 @@ class HomeScreen extends StatelessWidget {
               children: [
                 GhostTextButton(label: 'How to Play', onPressed: onHowToPlay),
                 const SizedBox(width: 8),
-                GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+                GhostTextButton(
+                  label: 'Settings',
+                  onPressed: () => _handleOpenSettings(context),
+                ),
               ],
             ),
           ],
@@ -134,7 +147,17 @@ class HomeScreen extends StatelessWidget {
               onPressed: onTurnOnBluetooth,
             ),
             const SizedBox(height: 6),
-            GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GhostTextButton(label: 'How to Play', onPressed: onHowToPlay),
+                const SizedBox(width: 8),
+                GhostTextButton(
+                  label: 'Settings',
+                  onPressed: () => _handleOpenSettings(context),
+                ),
+              ],
+            ),
           ],
         );
       case HomeConnectionState.permissionRequired:
@@ -152,7 +175,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: onRetryScan ?? onStartGame,
             ),
             const SizedBox(height: 6),
-            GhostTextButton(label: 'Settings', onPressed: onOpenSettings),
+            GhostTextButton(
+              label: 'Settings',
+              onPressed: () => _handleOpenSettings(context),
+            ),
           ],
         );
     }

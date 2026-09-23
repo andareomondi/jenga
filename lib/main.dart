@@ -7,6 +7,7 @@ import 'package:jenga/presentation/widgets/toast.dart';
 import 'package:jenga/repo/bluetooth_repository.dart';
 import 'package:jenga/repo/player_repository.dart';
 import 'package:jenga/services/bluetooth_scanner_service.dart';
+import 'package:jenga/services/game_settings_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +15,9 @@ void main() async {
   final playerRepo = PlayerRepository();
   await playerRepo.initialize();
   await bluetoothRepo.initialize();
+  final gameSettingsService = GameSettingsService();
+  await gameSettingsService.initialize();
+
   runApp(const JengaApp());
 }
 
