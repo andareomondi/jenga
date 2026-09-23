@@ -154,8 +154,9 @@ class GameCubit extends Cubit<GameState> {
     final basePoints = _settings.getBaseBlockRemovalPoints();
 
     if (isUnstable) return basePoints + 5; // Bonus for unstable
-    if (totalBlockCount <= _settings.getMinBlocksForGame())
+    if (totalBlockCount <= _settings.getMinBlocksForGame()) {
       return basePoints + 2;
+    }
     if (intactLayers >= 12) return basePoints - 2;
     return basePoints;
   }
@@ -284,6 +285,7 @@ class GameCubit extends Cubit<GameState> {
           currentPlayerIndex: nextPlayerIndex,
           turnCount: newTurnCount,
           clearError: true,
+          clearActiveChallenge: true,
         );
 
         if (_shouldTriggerChallenge(newState, newTurnCount)) {
@@ -326,8 +328,9 @@ class GameCubit extends Cubit<GameState> {
     if (!_challengeService.shouldTriggerChallenge(turnCount)) return false;
     if (state.activeChallenge != null) return false;
     if (state.totalBlockCount < _settings.getMinBlocksForGame() ||
-        state.intactLayers < 2)
+        state.intactLayers < 2) {
       return false;
+    }
     return true;
   }
 

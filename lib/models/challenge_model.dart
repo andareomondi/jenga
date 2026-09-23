@@ -69,19 +69,22 @@ class Challenge {
     );
   }
 
-  factory Challenge.customConstraint({
+factory Challenge.customConstraint({
     required String title,
     required String description,
     required ChallengeDifficulty difficulty,
+    int? rewardPoints,
+    int? timeLimit,
     required Map<String, dynamic> constraints,
   }) {
+
     return Challenge(
       id: 'challenge_custom_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
       description: description,
       difficulty: difficulty,
-      rewardPoints: _getRewardByDifficulty(difficulty),
-      timeLimit: _getTimeLimitByDifficulty(difficulty),
+      rewardPoints: rewardPoints ?? _getRewardByDifficulty(difficulty),
+      timeLimit: timeLimit ?? _getTimeLimitByDifficulty(difficulty),
       type: ChallengeType.custom,
       constraints: constraints,
     );

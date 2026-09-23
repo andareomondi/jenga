@@ -54,7 +54,7 @@ class ChallengeService {
           title: 'Off-Hand Touch',
           description: 'Remove 1 block using only your non-dominant hand!',
           difficulty: ChallengeDifficulty.easy,
-          // rewardPoints: easyReward,
+          rewardPoints: easyReward,
           constraints: {'blockCount': 1},
         );
       case 1:
@@ -62,7 +62,7 @@ class ChallengeService {
           title: 'Two-Finger Pinch',
           description: 'Remove 1 block using only your thumb and index finger!',
           difficulty: ChallengeDifficulty.easy,
-          // rewardPoints: easyReward,
+          rewardPoints: easyReward,
           constraints: {'blockCount': 1},
         );
       default:
@@ -70,7 +70,7 @@ class ChallengeService {
           title: 'Steady Rhythm',
           description: 'Remove 1 block within 30 seconds',
           difficulty: ChallengeDifficulty.easy,
-          // rewardPoints: easyReward,
+          rewardPoints: easyReward,
           constraints: {'timeLimit': 30, 'blockCount': 1},
         );
     }
@@ -87,7 +87,7 @@ class ChallengeService {
           title: 'Speed Pull',
           description: 'Remove 1 block in under 15 seconds!',
           difficulty: ChallengeDifficulty.medium,
-          // rewardPoints: mediumReward,
+          rewardPoints: mediumReward,
           constraints: {'timeLimit': 15, 'blockCount': 1},
         );
       case 1:
@@ -95,7 +95,7 @@ class ChallengeService {
           title: 'Shaky Base',
           description: 'Remove a block from the base of the Jenga game',
           difficulty: ChallengeDifficulty.medium,
-          // rewardPoints: mediumReward,
+          rewardPoints: mediumReward,
           constraints: {'blockCount': 1},
         );
       default:
@@ -103,7 +103,7 @@ class ChallengeService {
           title: 'One Finger Push',
           description: 'Push a block out using only ONE finger!',
           difficulty: ChallengeDifficulty.medium,
-          // rewardPoints: mediumReward,
+          rewardPoints: mediumReward,
           constraints: {'blockCount': 1},
         );
     }
@@ -111,7 +111,7 @@ class ChallengeService {
 
   /// Generate hard challenge (strict time limits or speed double removal)
   Challenge _generateHardChallenge(int blockCount) {
-    final hardType = _random.nextInt(4);
+    final hardType = _random.nextInt(5);
     final hardReward = _settings.getHardRewardPoints();
 
     switch (hardType) {
@@ -120,8 +120,9 @@ class ChallengeService {
           title: 'Lightning Reflexes',
           description: 'Remove 1 block in under 8 seconds!',
           difficulty: ChallengeDifficulty.hard,
-          // rewardPoints: hardReward,
-          constraints: {'timeLimit': 8, 'blockCount': 1},
+          rewardPoints: hardReward,
+          timeLimit: 8,
+          constraints: {'blockCount': 1},
         );
       case 1:
         return Challenge.customConstraint(
@@ -129,15 +130,26 @@ class ChallengeService {
           description:
               'Remove 1 block of other players choosing in under 20 seconds!',
           difficulty: ChallengeDifficulty.hard,
-          // rewardPoints: hardReward,
-          constraints: {'timeLimit': 20, 'blockCount': 1},
+          rewardPoints: hardReward,
+          timeLimit: 20,
+          constraints: {'blockCount': 1},
         );
       case 2:
         return Challenge.customConstraint(
           title: 'Death Pull',
-          description: 'Remove 1 block with your eyes closed',
+          description: 'Remove 1 block with your eyes closed in under 30 seconds!',
           difficulty: ChallengeDifficulty.hard,
-          // rewardPoints: hardReward,
+          rewardPoints: hardReward,
+          timeLimit: 30,
+          constraints: {'blockCount': 1},
+        );
+      case 3:
+        return Challenge.customConstraint(
+          title: 'Death Trap',
+          description: 'Remove 1 blocks from the base of the tower in under 30 seconds! ',
+          difficulty: ChallengeDifficulty.hard,
+          rewardPoints: hardReward,
+          timeLimit: 30,
           constraints: {'blockCount': 1},
         );
       default:
@@ -146,8 +158,9 @@ class ChallengeService {
           description:
               'Remove 1 block in under 10 seconds using ONLY your non-dominant hand!',
           difficulty: ChallengeDifficulty.hard,
-          // rewardPoints: hardReward,
-          constraints: {'timeLimit': 10, 'blockCount': 1},
+          rewardPoints: hardReward,
+          timeLimit: 10,
+          constraints: {'blockCount': 1},
         );
     }
   }
@@ -159,7 +172,7 @@ class ChallengeService {
       title: 'Steady Hand',
       description: 'Remove 1 block carefully',
       difficulty: ChallengeDifficulty.easy,
-      // rewardPoints: easyReward,
+      rewardPoints: easyReward,
       constraints: {'blockCount': 1},
     );
   }
