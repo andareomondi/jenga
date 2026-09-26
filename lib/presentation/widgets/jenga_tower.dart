@@ -1,47 +1,29 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-/// Which block (if any) is currently mid-removal-animation.
-class RemovingBlock {
-  const RemovingBlock({required this.layerIndex, required this.blockIndex});
-  final int layerIndex;
-  final int blockIndex;
-}
-
-/// The signature visual element of the app: a stylized stack of layers
-/// (54 blocks total, minus 2 removed = one full tower). Communicates layer
-/// count, orientation alternation, and — through [wobble]/[isCollapsed] —
-/// rising tension as the physical game progresses.
+/// The signature visual element of the app: a stylized stack of layers.
+/// Dynamically calculates exact block layout based on [totalBlocks].
 class JengaTower extends StatefulWidget {
   const JengaTower({
     super.key,
-    required this.fullLayers,
+    required this.totalBlocks,
     this.blockWidth = 15,
     this.blockHeight = 46,
     this.gap = 3,
     this.wobble = false,
     this.isCollapsed = false,
-    this.removing,
-    this.placingOnTop = false, // Replaced placingTopLayer with placingOnTop
+    this.isRemoving = false, // Replaced positional RemovingBlock with a boolean
+    this.placingOnTop = false, 
   });
 
-  /// Base number of intact layers remaining (0–14). 14 = full tower (54 blocks).
-  final int fullLayers;
+  /// Total number of blocks currently in the tower (e.g., from Cubit state)
+  final int totalBlocks;
   final double blockWidth;
   final double blockHeight;
   final double gap;
-
-  /// Subtle shake — shown when the tower is getting unstable.
   final bool wobble;
-
-  /// Plays the toppling animation. Used for the game-over moment.
   final bool isCollapsed;
-
-  /// If set, animates that specific block sliding out (block-removed state).
-  final RemovingBlock? removing;
-
-  /// If true, builds an extra dynamic layer on top of the current tower 
-  /// and animates it dropping into place.
+  final bool isRemoving;
   final bool placingOnTop;
 
   @override
@@ -78,15 +60,15 @@ class _JengaTowerState extends State<JengaTower> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // Determine total layers to draw. If placingOnTop is active, we expand the 
-    // list count by one to accommodate the newly built row.
-    final visibleLayerCount = widget.placingOnTop ? widget.fullLayers + 1 : widget.fullLayers;
-    final layers = List.generate(visibleLayerCount, (i) => i);
+    // If placing on top, we visually simulate an extra block dropping in
+    final int visibleBlocks = widget.placingOnTop ? widget.totalBlocks + 1 : widget.totalBlocks;
+    final int totalLayerCount = (visibleBlocks / 3).ceil();
+    final layers = List.generate(totalLayerCount, (i) => i);
 
     Widget stack = Column(
       mainAxisSize: MainAxisSize.min,
-      verticalDirection: VerticalDirection.up, // bottom layer first, stack grows up
-      children: [for (final i in layers) _buildLayer(i, visibleLayerCount)],
+      verticalDirection: VerticalDirection.up, 
+      children: [for (final i in layers) _buildLayer(i, totalLayerCount, visibleBlocks)],
     );
 
     if (widget.wobble) {
@@ -96,7 +78,7 @@ class _JengaTowerState extends State<JengaTower> with TickerProviderStateMixin {
           final angle = sin(_wobbleController.value * pi * 2) * 0.015; 
           return Transform.rotate(
             angle: angle, 
-            alignment: Alignment.bottomCenter, // Wobbles realistically from its root base
+            alignment: Alignment.bottomCenter,
             child: child,
           );
         },
@@ -107,48 +89,78 @@ class _JengaTowerState extends State<JengaTower> with TickerProviderStateMixin {
     return stack;
   }
 
-  Widget _buildLayer(int layerIndex, int totalLayerCount) {
-    final isVertical = layerIndex.isEven; // alternate orientation based on the layer count index
-    final isNewTopLayer = widget.placingOnTop && (layerIndex == totalLayerCount - 1);
+  Widget _buildLayer(int layerIndex, int totalLayerCount, int visibleBlocks) {
+    final isVertical = layerIndex.isEven; 
+    
+    // Determine how many blocks belong in this specific layer
+    int blocksInThisLayer = 3;
+    if (layerIndex == totalLayerCount - 1) {
+      blocksInThisLayer = visibleBlocks % 3;
+      if (blocksInThisLayer == 0) blocksInThisLayer = 3;
+    }
+
+    // Pick a pseudo-random stable block to slide out if a removal is happening
+    int targetRemoveLayer = totalLayerCount - 3;
+    if (targetRemoveLayer < 0) targetRemoveLayer = 0;
+    const int targetRemoveBlock = 1; // Slide out the middle block
 
     Widget row = Row(
       mainAxisSize: MainAxisSize.min,
+      // Always generate 3 slots to maintain structural alignment when layer is incomplete
       children: List.generate(3, (blockIndex) {
-        final isRemoving =
-            widget.removing?.layerIndex == layerIndex &&
-            widget.removing?.blockIndex == blockIndex;
-        return Padding(
+        
+        // Render an empty space for missing blocks
+        if (blockIndex >= blocksInThisLayer) {
+          return Padding(
+             padding: EdgeInsets.symmetric(horizontal: widget.gap / 2),
+             child: SizedBox(
+               width: isVertical ? widget.blockWidth : widget.blockHeight,
+               height: isVertical ? widget.blockHeight : widget.blockWidth,
+             ),
+          );
+        }
+
+        final isAnimateRemoving = widget.isRemoving &&
+                                  layerIndex == targetRemoveLayer &&
+                                  blockIndex == targetRemoveBlock;
+
+        final isNewTopBlock = widget.placingOnTop && 
+                              layerIndex == totalLayerCount - 1 && 
+                              blockIndex == blocksInThisLayer - 1;
+
+        Widget block = Padding(
           padding: EdgeInsets.symmetric(horizontal: widget.gap / 2),
           child: _JengaBlock(
             width: isVertical ? widget.blockWidth : widget.blockHeight,
             height: isVertical ? widget.blockHeight : widget.blockWidth,
-            ghost: false, // The dynamic topmost layers are active pieces, not transparent placeholders
-            removing: isRemoving,
+            ghost: false, 
+            removing: isAnimateRemoving,
             isVerticalOrientation: isVertical,
           ),
         );
+
+        // Animate ONLY the newly placed top block, not the entire layer
+        if (isNewTopBlock) {
+          block = TweenAnimationBuilder<double>(
+            key: ValueKey('top_placement_block_$visibleBlocks'),
+            tween: Tween(begin: -100, end: 0),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.bounceOut,
+            builder: (context, dy, child) =>
+                Transform.translate(offset: Offset(0, dy), child: child),
+            child: block,
+          );
+        }
+
+        return block;
       }),
     );
-
-    // If this specific layer is the freshly added top layer, animate its arrival drop
-    if (isNewTopLayer) {
-      row = TweenAnimationBuilder<double>(
-        // Explicit unique key forces the animation to play fresh whenever a new layer triggers it
-        key: ValueKey('top_placement_layer_$layerIndex'),
-        tween: Tween(begin: -100, end: 0),
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.bounceOut, // Tactile bouncing drop feedback onto the stack
-        builder: (context, dy, child) =>
-            Transform.translate(offset: Offset(0, dy), child: child),
-        child: row,
-      );
-    }
 
     if (widget.isCollapsed) {
       final dx = (_rand.nextDouble() - 0.5) * 220;
       final dy = 300.0 + (_rand.nextDouble() * 100);
       final rot = (_rand.nextDouble() - 0.5) * 2.5;
-      final delay = (totalLayerCount - layerIndex) * 0.04; // Tops collapse first!
+      final delay = (totalLayerCount - layerIndex) * 0.04; 
 
       return AnimatedBuilder(
         animation: _collapseController,
@@ -249,8 +261,8 @@ class _JengaBlockState extends State<_JengaBlock> with SingleTickerProviderState
       animation: _slideController,
       builder: (context, child) {
         final translationOffset = widget.isVerticalOrientation
-            ? Offset(0, _translationAnimation.value) // Slides out along Y axis
-            : Offset(_translationAnimation.value, 0); // Slides out along X axis
+            ? Offset(0, _translationAnimation.value) 
+            : Offset(_translationAnimation.value, 0); 
 
         return Opacity(
           opacity: widget.ghost ? 0.16 : _fadeAnimation.value,

@@ -160,12 +160,12 @@ class _PlayScreenState extends State<PlayScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      JengaTower(
-                        fullLayers: widget.intactLayers,
-                        wobble: widget.isUnstable,
-                        placingOnTop:
-                            widget.phase == GamePhase.waitingPlacement,
-                      ),
+JengaTower(
+  totalBlocks: widget.totalBlockCount, 
+  wobble: widget.isUnstable,
+  placingOnTop: widget.phase == GamePhase.waitingPlacement,
+  isRemoving: widget.phase == GamePhase.blockRemoved,
+),
                       const SizedBox(height: 20),
                       Text.rich(
                         TextSpan(

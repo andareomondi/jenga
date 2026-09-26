@@ -24,7 +24,7 @@ class TowerCollapseScreen extends StatelessWidget {
       children: [
         Opacity(
           opacity: 0.5,
-          child: Center(child: JengaTower(fullLayers: 3, isCollapsed: true)),
+          child: Center(child: JengaTower(totalBlocks: 18, isCollapsed: true)),
         ),
         Container(color: AppColors.cream.withOpacity(0.92)),
         SafeArea(

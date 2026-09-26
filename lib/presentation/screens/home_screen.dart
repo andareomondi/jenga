@@ -69,11 +69,11 @@ class HomeScreen extends StatelessWidget {
                   child: Opacity(
                     opacity: _isConnected ? 1 : 0.35,
                     child: JengaTower(
-                      wobble: _isConnected ? false : true,
-                      fullLayers: 14,
-                      blockWidth: 15,
-                      blockHeight: 44,
-                    ),
+  wobble: _isConnected ? false : true,
+  totalBlocks: 54, // 54 blocks = 18 full layers
+  blockWidth: 15,
+  blockHeight: 44,
+),
                   ),
                 ),
               ),
