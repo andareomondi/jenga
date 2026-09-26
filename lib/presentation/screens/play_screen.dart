@@ -163,7 +163,7 @@ class _PlayScreenState extends State<PlayScreen> {
                       JengaTower(
                         fullLayers: widget.intactLayers,
                         wobble: widget.isUnstable,
-                        placingTopLayer:
+                        placingOnTop:
                             widget.phase == GamePhase.waitingPlacement,
                       ),
                       const SizedBox(height: 20),

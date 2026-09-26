@@ -70,7 +70,7 @@ class HomeScreen extends StatelessWidget {
                     opacity: _isConnected ? 1 : 0.35,
                     child: JengaTower(
                       wobble: _isConnected ? false : true,
-                      fullLayers: JengaTower.totalLayers,
+                      fullLayers: 14,
                       blockWidth: 15,
                       blockHeight: 44,
                     ),
